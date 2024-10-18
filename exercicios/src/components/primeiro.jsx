@@ -1,6 +1,9 @@
 import React from 'react';
 import {Text} from 'react-native';
+import estilo from './estilo';
 
 export default function Primeiro() {
-    return <Text>Primeiro</Text>;
+    return (
+        <Text style={estilo.fontG}>Primeiro</Text>
+    )
 }
