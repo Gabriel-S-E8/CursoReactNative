@@ -1,0 +1,5 @@
+//Rnomear para .env
+
+module.export = {
+    authSecret: ''
+}
