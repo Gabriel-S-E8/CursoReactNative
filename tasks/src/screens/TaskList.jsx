@@ -15,7 +15,8 @@ import Icon from 'react-native-vector-icons/FontAwesome';
 import moment from 'moment';
 import 'moment/locale/pt-br';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import axios from 'axios';
+import { server, showError } from '../common';
 import commonStyles from '../commonStyles';
 import todayImage from '../../assets/imgs/today.jpg';
 import Task from '../components/Task';
@@ -33,15 +34,13 @@ export default class TaskList extends Component {
         ...initialState,
     };
 
-    toggleTask = (taskId) => {
-        const tasks = [...this.state.tasks];
-        tasks.forEach((task) => {
-            if (task.id === taskId) {
-                task.doneAt = task.doneAt ? null : new Date();
-            }
-        });
-
-        this.setState({ tasks }, this.filterTasks);
+    toggleTask = async (taskId) => {
+        try {
+            await axios.put(`${server}/tasks/${taskId}/toggle`);
+            this.loadTasks();
+        } catch (e) {
+            showError(e);
+        }
     };
 
     toggleFilter = () => {
@@ -50,12 +49,33 @@ export default class TaskList extends Component {
             this.filterTasks,
         );
     };
+
     componentDidMount = async () => {
-        await AsyncStorage.getItem('tasks').then((value) => {
-            const tasks = JSON.parse(value);
-            this.setState({ tasks }, this.filterTasks);
-        });
+        const stateString = await AsyncStorage.getItem('tasksState');
+        const savedState = JSON.parse(stateString) || initialState;
+        this.setState(
+            {
+                showDoneTasks: savedState.showDoneTasks,
+            },
+            this.filterTasks,
+        );
+
+        this.loadTasks();
     };
+
+    loadTasks = async () => {
+        try {
+            const maxDate = moment()
+                .add({ days: this.props.daysAhead })
+                .format('YYYY-MM-DD 23:59:59');
+            const res = await axios.get(`${server}/tasks?date=${maxDate}`);
+            this.setState({ tasks: res.data }, this.filterTasks);
+            console.log("MaxDate", maxDate);
+        } catch (e) {
+            showError(e);
+        }
+    };
+
     filterTasks = () => {
         let visibleTasks = null;
         if (this.state.showDoneTasks) {
@@ -67,27 +87,38 @@ export default class TaskList extends Component {
 
         this.setState({ visibleTasks });
 
-        AsyncStorage.setItem('tasks', JSON.stringify(this.state.tasks));
+        AsyncStorage.setItem(
+            'tasksState',
+            JSON.stringify({
+                showDoneTasks: this.state.showDoneTasks,
+            }),
+        );
     };
 
-    addTask = (newTask) => {
+    addTask = async (newTask) => {
         if (!newTask.desc || !newTask.desc.trim()) {
             Alert.alert('Dados Inválidos', 'Descrição não informada!');
             return;
         }
-        const tasks = [...this.state.tasks];
-        tasks.push({
-            id: Math.random(),
-            desc: newTask.desc,
-            estimateAt: newTask.date,
-            doneAt: null,
-        });
-        this.setState({ tasks, showAddTask: false }, this.filterTasks);
+        try {
+            await axios.post(`${server}/tasks`, {
+                desc: newTask.desc,
+                estimateAt: newTask.date,
+            });
+
+            this.setState({ showAddTask: false }, this.loadTasks);
+        } catch (e) {
+            showError(e);
+        }
     };
 
-    deleteTask = (id) => {
-        const tasks = this.state.tasks.filter((task) => task.id !== id);
-        this.setState({ tasks }, this.filterTasks);
+    deleteTask = async (taskId) => {
+        try {
+            await axios.delete(`${server}/tasks/${taskId}`);
+            this.loadTasks();
+        } catch (e) {
+            showError(e);
+        }
     };
 
     render() {
@@ -105,6 +136,17 @@ export default class TaskList extends Component {
                         style={styles.background}
                     >
                         <View style={styles.iconBar}>
+                            <TouchableOpacity
+                                onPress={() =>
+                                    this.props.navigation.openDrawer()
+                                }
+                            >
+                                <Icon
+                                    name="bars"
+                                    size={20}
+                                    color={commonStyles.colors.secondary}
+                                />
+                            </TouchableOpacity>
                             <TouchableOpacity onPress={this.toggleFilter}>
                                 <Icon
                                     name={
@@ -118,7 +160,7 @@ export default class TaskList extends Component {
                             </TouchableOpacity>
                         </View>
                         <View style={styles.titleBar}>
-                            <Text style={styles.title}>Hoje</Text>
+                            <Text style={styles.title}>{this.props.title}</Text>
                             <Text style={styles.subtitle}>{today}</Text>
                         </View>
                     </ImageBackground>
@@ -184,7 +226,7 @@ const styles = StyleSheet.create({
     iconBar: {
         flexDirection: 'row',
         marginTop: Platform.OS === 'ios' ? 30 : 10,
-        justifyContent: 'flex-end',
+        justifyContent: 'space-between',
         marginHorizontal: 20,
     },
     addButton: {
