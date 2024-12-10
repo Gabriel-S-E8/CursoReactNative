@@ -28,7 +28,7 @@ module.exports = app => {
             })   
         } else {
             res.status(400).send(
-
+                'Usuário não cadastrado'
             )
         }
     }

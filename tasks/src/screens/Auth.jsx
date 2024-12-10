@@ -10,6 +10,7 @@ import {
 
 import axios from 'axios';
 import backgroundImage from '../../assets/imgs/login.jpg';
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import commonStyles from '../commonStyles';
 import AuthInput from '../components/AuthInput';
 
@@ -52,16 +53,17 @@ export default class Auth extends Component {
         try {
             const res = await axios.post(`${server}/signin`, {
                 email: this.state.email,
-                password: this.state.password,
-            });
-            axios.defaults.headers.common[
-                'Authorization'
-            ] = `bearer ${res.data.token}`;
-            this.props.navigation.navigate('Home');
+                password: this.state.password
+            })
+
+            AsyncStorage.setItem('userData', JSON.stringify(res.data))
+            axios.defaults.headers.common['Authorization'] = `bearer ${res.data.token}`
+            console.log("Data", res.data.email, res.data.name)
+            this.props.navigation.navigate('Home', { email: res.data.email, name: res.data.name })
         } catch (e) {
-            showError(e);
+            showError(e)
         }
-    };
+    }
 
     render() {
         const validations = [];

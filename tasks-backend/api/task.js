@@ -5,7 +5,6 @@ module.exports = (app) => {
         const date = req.query.date
             ? req.query.date
             : moment().endOf('day').toDate();
-        console.log("Date", date);
         app.db('tasks')
             .where({ userId: req.user.id })
             .where('estimateAt', '<=', date)
